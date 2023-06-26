@@ -88,36 +88,30 @@ _init() {
   else
     # Calculate memory to use for zram
     totalmem=$(awk '/MemTotal/{print $2}' /proc/meminfo)
-    # TODO: start 'fix-busybox' changes
     mem=$(calc "$totalmem * $_comp_factor * $_zram_fraction * 1024")
-    # mem=$(awk "BEGIN{print $totalmem*$_comp_factor*$_zram_fraction*1024}")
-    # end 'fix-busybox' changes
   fi
 
   # NOTE: zramctl sometimes fails if we don't wait for the module to settle after loading
   #       we'll retry a couple of times with slightly increasing delays before giving up
   # TODO: start 'fix-busybox' changes
   modprobe zram
-  sleep 1
-  #_device=''
-  # for i in $(seq 3); do
-  #   # sleep for "0.1 * $i" seconds rounded to 2 digits
-  #   sleep "$(calc 2 "0.1 * $i")"
-  #   _device=$(zramctl -f -s "$mem" -a "$_zram_algorithm") || true
-  #   [ -b "$_device" ] && break
-  # done
-  _device=/dev/zram0
 
-  echo "$mem" > /sys/block/zram0/mem_limit
-  echo "$mem" > /sys/block/zram0/disksize
+  _device=/dev/zram0
+  for i in $(seq 3); do
+    # sleep for "0.1 * $i" seconds rounded to 2 digits
+    sleep "$(calc 2 "0.1 * $i")"
+    [ -b "$_device" ] && break
+  done
+
   echo "$_zram_algorithm" > /sys/block/zram0/comp_algorithm
+  echo "$mem" > /sys/block/zram0/disksize
   # end 'fix-busybox' changes
 
   if [ -b "$_device" ]; then
     # cleanup the device if swap setup fails
     trap "_rem_zdev $_device" EXIT
     mkswap "$_device"
-    swapon -p 15 "$_device"
+    swapon -p 100 "$_device"
     trap - EXIT
     return 0
   else
@@ -146,14 +140,12 @@ _rem_zdev() {
     return 1
   fi
   # TODO: start 'fix-busybox' changes
-  # for i in $(seq 3); do
-  #   # sleep for "0.1 * $i" seconds rounded to 2 digits
-  #   sleep "$(calc 2 "0.1 * $i")"
-  #   zramctl -r "$1" || true
-  #   [ -b "$1" ] || break
-  # done
-  modprobe -r zram
-  sleep 1
+  for i in $(seq 3); do
+    # sleep for "0.1 * $i" seconds rounded to 2 digits
+    sleep "$(calc 2 "0.1 * $i")"
+    modprobe -r zram
+    [ -b "$1" ] || break
+  done
   # end 'fix-busybox' changes
   if [ -b "$1" ]; then
     err "rem_zdev: Couldn't remove zram device '$1' after 3 attempts"
