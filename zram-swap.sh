@@ -97,6 +97,8 @@ _init() {
   # NOTE: zramctl sometimes fails if we don't wait for the module to settle after loading
   #       we'll retry a couple of times with slightly increasing delays before giving up
   # TODO: start 'fix-busybox' changes
+  modprobe zram
+  sleep 1
   #_device=''
   # for i in $(seq 3); do
   #   # sleep for "0.1 * $i" seconds rounded to 2 digits
@@ -109,8 +111,6 @@ _init() {
   echo "$mem" > /sys/block/zram0/mem_limit
   echo "$mem" > /sys/block/zram0/disksize
   echo "$_zram_algorithm" > /sys/block/zram0/comp_algorithm
-
-  sleep 1
   # end 'fix-busybox' changes
 
   if [ -b "$_device" ]; then
