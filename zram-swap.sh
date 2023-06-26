@@ -88,24 +88,36 @@ _init() {
   else
     # Calculate memory to use for zram
     totalmem=$(awk '/MemTotal/{print $2}' /proc/meminfo)
+    # TODO: start 'fix-busybox' changes
     mem=$(calc "$totalmem * $_comp_factor * $_zram_fraction * 1024")
+    # mem=$(awk "BEGIN{print $totalmem*$_comp_factor*$_zram_fraction*1024}")
+    # end 'fix-busybox' changes
   fi
 
   # NOTE: zramctl sometimes fails if we don't wait for the module to settle after loading
   #       we'll retry a couple of times with slightly increasing delays before giving up
-  _device=''
-  for i in $(seq 3); do
-    # sleep for "0.1 * $i" seconds rounded to 2 digits
-    sleep "$(calc 2 "0.1 * $i")"
-    _device=$(zramctl -f -s "$mem" -a "$_zram_algorithm") || true
-    [ -b "$_device" ] && break
-  done
+  # TODO: start 'fix-busybox' changes
+  #_device=''
+  # for i in $(seq 3); do
+  #   # sleep for "0.1 * $i" seconds rounded to 2 digits
+  #   sleep "$(calc 2 "0.1 * $i")"
+  #   _device=$(zramctl -f -s "$mem" -a "$_zram_algorithm") || true
+  #   [ -b "$_device" ] && break
+  # done
+  _device=/dev/zram0
+
+  echo "$mem" > /sys/block/zram0/mem_limit
+  echo "$mem" > /sys/block/zram0/disksize
+  echo "$_zram_algorithm" > /sys/block/zram0/comp_algorithm
+
+  sleep 1
+  # end 'fix-busybox' changes
 
   if [ -b "$_device" ]; then
     # cleanup the device if swap setup fails
     trap "_rem_zdev $_device" EXIT
     mkswap "$_device"
-    swapon -d -p 15 "$_device"
+    swapon -p 15 "$_device"
     trap - EXIT
     return 0
   else
@@ -133,12 +145,16 @@ _rem_zdev() {
     err "rem_zdev: No zram device '$1' to remove"
     return 1
   fi
-  for i in $(seq 3); do
-    # sleep for "0.1 * $i" seconds rounded to 2 digits
-    sleep "$(calc 2 "0.1 * $i")"
-    zramctl -r "$1" || true
-    [ -b "$1" ] || break
-  done
+  # TODO: start 'fix-busybox' changes
+  # for i in $(seq 3); do
+  #   # sleep for "0.1 * $i" seconds rounded to 2 digits
+  #   sleep "$(calc 2 "0.1 * $i")"
+  #   zramctl -r "$1" || true
+  #   [ -b "$1" ] || break
+  # done
+  modprobe -r zram
+  sleep 1
+  # end 'fix-busybox' changes
   if [ -b "$1" ]; then
     err "rem_zdev: Couldn't remove zram device '$1' after 3 attempts"
     return 1
